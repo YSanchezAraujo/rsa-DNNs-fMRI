@@ -36,11 +36,12 @@ class AlxLayerAct(torch.nn.Module):
         self.features = torch.nn.Sequential(
             *list(orig_model.features.children())[:net_num]
         )
+
     def forward(self, x):
         x = self.features(x)
         return x
-            
-def get_layer_activation(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -> torch.tensor:
+
+def layer_act(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -> torch.tensor:
     """
     parameters:
         data::torch.tensor - input data of the image, already
@@ -53,11 +54,30 @@ def get_layer_activation(data: torch.tensor, alexnet_model: torch.nn.Module, lay
         to a particular pare of the network
         
     returns:
-        activations::torch.tensor - activation of the network up 
-        until the ReLu of layer number: <layer>
+        activations::torch.tensor - forward pass of the network up 
+        until layer number: <layer>
     """
     mapper = {1:-12, 4:-9, 7:-6, 9:-4, 11:-2}
     if layer not in mapper.keys():
         raise Exception("layer must be one of: [1, 4, 7, 9, 11]")
     layer_model = AlxLayerAct(mapper[layer], alexnet_model)
     return layer_model(data)
+
+def all_acts(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
+    """
+    parameters:
+        data::torch.tensor - input data of the image, already
+        processed with procces_img function
+        
+        alexnet_model::torch.nn.Module - pretrained alexnet model 
+        loaded from torchvision
+        
+    returns:
+        activations::dict(int:torch.tensor) - forward pass of the network up 
+        until layer number: <layer>, for all relevant layers     
+    """
+    layers = (1,4, 7, 9, 11)
+    acts = {}
+    for val in layers:
+        acts[val] = layer_act(data, alexnet_model, val)
+    return acts
