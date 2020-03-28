@@ -3,7 +3,7 @@ from torchvision import transforms
 import torch
 import numpy as np
 
-def batch(iterable: range, batch_size: int) -> iter:
+def gen_batch(iterable: range, batch_size: int) -> iter:
     """
     parameters:
         iteratble::range - range object with the upper as
@@ -50,18 +50,18 @@ def process_img(img_path: str, unsqueeze: bool = False) -> torch.tensor:
         a pytorch tensor of shapes:
             (3, 244, 244) or (1, 3, 244 244)
     """
-    pill_img = Image.open(img_path)
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize(
-            mean = [0.485, 0.456, 0.406],
-            std = [0.229, 0.224, 0.225])
-    ])
-    if unsqueeze:
-        return torch.unsqueeze(transform(pill_img), 0)
-    return transform(pill_img)
+    with Image.open(img_path) as pill_img:
+        transform = transforms.Compose([
+            transforms.Resize(256),
+            transforms.CenterCrop(224),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean = [0.485, 0.456, 0.406],
+                std = [0.229, 0.224, 0.225])
+        ])
+        if unsqueeze:
+            return torch.unsqueeze(transform(pill_img), 0)
+        return transform(pill_img)
 
 
 class AlxLayerAct(torch.nn.Module):
