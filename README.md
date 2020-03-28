@@ -1,6 +1,6 @@
 # RSA between deepnets and fMRI data from the sherlock dataset
 
-502b project of Yoel Sanchez-Arraujo and Jorge Yanar
+502b project of Yoel Sanchez Arraujo and Jorge Yanar
 
 ## TODO
 
