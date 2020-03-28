@@ -1,6 +1,40 @@
 from PIL import Image
 from torchvision import transforms
 import torch
+import numpy as np
+
+def batch(iterable: range, batch_size: int) -> iter:
+    """
+    parameters:
+        iteratble::range - range object with the upper as
+        the total number of frames
+        
+        batch_size::int - the step size for the range object,
+        this will be used to creat batches of length <batch_size>
+        
+    returns:
+        iterable::range - range object with at the current position
+        along the total number of frames, of length <batch_size>
+    """
+    l = len(iterable)
+    for ndx in range(0, l, batch_size):
+        yield iterable[ndx:min(ndx + batch_size, l)]
+
+        
+def sort_files(file_list: list) -> np.array:
+    """
+    parameters:
+        file_list::list - paths for all pngs of the sherlock movie
+    
+    returns:
+        sorted_file_list::np.array(type::strings) - sorted version of
+        file_list, sorted by the frame number
+    """
+    sorted_list = []
+    for i in file_list:
+        sorted_list.append(int(i.split("_")[-1].split(".")[0]))
+    return np.array(file_list)[np.argsort(sorted_list)]
+
 
 def process_img(img_path: str, unsqueeze: bool = False) -> torch.tensor:
     """
@@ -22,8 +56,8 @@ def process_img(img_path: str, unsqueeze: bool = False) -> torch.tensor:
         transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])
+            mean = [0.485, 0.456, 0.406],
+            std = [0.229, 0.224, 0.225])
     ])
     if unsqueeze:
         return torch.unsqueeze(transform(pill_img), 0)
@@ -41,7 +75,8 @@ class AlxLayerAct(torch.nn.Module):
         x = self.features(x)
         return x
 
-def layer_act(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -> torch.tensor:
+    
+def layer_acts(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -> torch.tensor:
     """
     parameters:
         data::torch.tensor - input data of the image, already
@@ -63,6 +98,7 @@ def layer_act(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) ->
     layer_model = AlxLayerAct(mapper[layer], alexnet_model)
     return layer_model(data)
 
+
 def all_acts(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
     """
     parameters:
@@ -76,8 +112,8 @@ def all_acts(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
         activations::dict(int:torch.tensor) - forward pass of the network up 
         until layer number: <layer>, for all relevant layers     
     """
-    layers = (1,4, 7, 9, 11)
+    layers = (1, 4, 7, 9, 11)
     acts = {}
     for val in layers:
-        acts[val] = layer_act(data, alexnet_model, val)
+        acts[val] = layer_acts(data, alexnet_model, val)
     return acts
