@@ -3,6 +3,7 @@ from torchvision import transforms
 import torch
 import numpy as np
 
+# FUCNTION BELOW NOT IN USE ANYMORE, TO BE DELETED 
 def gen_batch(iterable: range, batch_size: int) -> iter:
     """
     parameters:
@@ -19,6 +20,49 @@ def gen_batch(iterable: range, batch_size: int) -> iter:
     l = len(iterable)
     for ndx in range(0, l, batch_size):
         yield iterable[ndx:min(ndx + batch_size, l)]
+        
+        
+def _mid_slice_idxs(max_len: int, can_use_range: tuple) -> tuple:
+    """
+    parameters:
+        max_len::int - how big we are allowing the resulting list to be
+        
+        can_use_range::tuple - tuple of 2 ints, denoting the
+        max of the range we can use and the min
+        
+    returns:
+        ::range  with the start and end indices giving the middle
+        <max_len> values of the collection it is applied to
+    """
+    diff = can_use_range[1] - can_use_range[0]
+    mid = int(diff / 2)
+    to_remove = diff - max_len
+    if to_remove > 1:
+        side_remove = int(to_remove / 2)
+    else:
+        side_remove = 0
+    return range(int(can_use_range[0] + side_remove), int(can_use_range[1] - side_remove + 1))     
+
+
+def gen_ranges(batch_size: float, tr_total: int, max_len: int) -> iter:
+    """
+    parameters:
+        batch_size::float - the number of frames in a TR, roughly
+        
+        tr_total::int - total number of TRs acquired for the scans
+        
+        max_len::int - the length of the truncated number of trs that 
+        we'll use to try and reduce TR to TR autocorrelation in the signal
+        
+    returns:
+        ::iter - generates the ranges to be used for each TR, taking into
+        account all of the input parameters
+    """
+    tr_counter = 0
+    while tr_counter < tr_total:
+        tr_counter += 1
+        can_use_range = (int(tr_counter*batch_size) + 2, int((tr_counter+1)*batch_size) - 2)
+        yield _mid_slice_idxs(max_len, can_use_range)
 
         
 def sort_files(file_list: list) -> np.array:
@@ -117,3 +161,16 @@ def all_acts(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
     for val in layers:
         acts[val] = layer_acts(data, alexnet_model, val)
     return acts
+
+def correlation_mat(data: np.array) -> np.array:
+    """
+    parameters:
+        data::np.array - concatenated (by TR) layer activations
+        
+    returns:
+        correlation_matrix::np.array - correlation matrix of the activations over TRs
+    """
+    X, Y, Z, T = data.shape
+    coln = Y * Z * T
+    data = data.reshape(X, coln)
+    return np.corrcoef(data)
