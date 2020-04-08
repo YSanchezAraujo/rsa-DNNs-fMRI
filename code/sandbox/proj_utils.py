@@ -8,12 +8,12 @@ def global_signal_regression(data4D: np.array, mask: np.array) -> np.array:
     g = np.zeros((time, 1))
     mask_bool = mask.astype(bool)
     for k in range(time):
-        data_slice = data4D[:, :, :, k]
-        g[k] = np.nanmean(data_slice[mask_bool])      
-    B = data4D.reshape(time, x*y*z)
+        data_slice = data[:, :, :, k]
+        g[k] = np.nanmean(data_slice[mask_bool])
+    B = data.reshape(time, x*y*z)
     gt = (1 / (g.T @ g)) @ g.T
-    resid = gt @ B
-    return (B - resid).reshape(x, y, z, time)
+    Bgt = gt @ B
+    return (B - g @ Bgt).reshape(x, y, z, time)
 
 
 # FUCNTION BELOW NOT IN USE ANYMORE, TO BE DELETED 
