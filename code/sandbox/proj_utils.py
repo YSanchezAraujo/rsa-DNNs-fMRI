@@ -3,19 +3,6 @@ from torchvision import transforms
 import torch
 import numpy as np
 
-def global_signal_regression(data4D: np.array, mask: np.array) -> np.array:
-    x, y, z, time = data4D.shape
-    g = np.zeros((time, 1))
-    mask_bool = mask.astype(bool)
-    for k in range(time):
-        data_slice = data[:, :, :, k]
-        g[k] = np.nanmean(data_slice[mask_bool])
-    B = data.reshape(time, x*y*z)
-    gt = (1 / (g.T @ g)) @ g.T
-    Bgt = gt @ B
-    return (B - g @ Bgt).reshape(x, y, z, time)
-
-
 # FUCNTION BELOW NOT IN USE ANYMORE, TO BE DELETED 
 def gen_batch(iterable: range, batch_size: int) -> iter:
     """
@@ -120,7 +107,7 @@ def process_img(img_path: str, unsqueeze: bool = False) -> torch.tensor:
             return torch.unsqueeze(transform(pill_img), 0)
         return transform(pill_img)
 
-
+# this one is for the conv layers
 class AlxLayerAct(torch.nn.Module):
     def __init__(self, net_num, orig_model):
         super(AlxLayerAct, self).__init__()
@@ -138,13 +125,13 @@ def layer_acts(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -
     parameters:
         data::torch.tensor - input data of the image, already
         processed with procces_img function
-        
+
         alexnet_model::torch.nn.Module - pretrained alexnet model 
         loaded from torchvision
-        
+
         layer::int - integer corresponding to the ReLU activation up 
         to a particular pare of the network
-        
+
     returns:
         activations::torch.tensor - forward pass of the network up 
         until layer number: <layer>
@@ -174,6 +161,69 @@ def all_acts(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
     for val in layers:
         acts[val] = layer_acts(data, alexnet_model, val)
     return acts
+    
+# this one is for the fully connected layers
+class AlxLayerFcAct(torch.nn.Module):
+    def __init__(self, net_num, orig_model):
+        super(AlxLayerFcAct, self).__init__()
+        self.features = torch.nn.Sequential(
+            *list(orig_model.features.children())
+        )
+        
+        self.avgpool = torch.nn.AdaptiveAvgPool2d(output_size=(6, 6))
+        
+        self.clf = torch.nn.Sequential(
+            *list(orig_model.classifier.children())[:net_num]
+        )
+        
+        
+    def forward(self, x):
+        return self.clf(
+            torch.flatten(self.avgpool((self.features(x))), 1)
+        )
+    
+def layer_acts_fc(data: torch.tensor, alexnet_model: torch.nn.Module, layer: int) -> torch.tensor:
+    """
+    parameters:
+        data::torch.tensor - input data of the image, already
+        processed with procces_img function
+        
+        alexnet_model::torch.nn.Module - pretrained alexnet model 
+        loaded from torchvision
+        
+        layer::int - integer corresponding to the ReLU activation up 
+        to a particular pare of the network
+        
+    returns:
+        activations::torch.tensor - forward pass of the network up 
+        until layer number: <layer>
+    """
+    mapper = {2:-5, 5:-2, 6:-1}
+    if layer not in mapper.keys():
+        raise Exception("layer must be one of: [2, 5, 6]")
+    layer_model = AlxLayerFcAct(mapper[layer], alexnet_model)
+    return layer_model(data)
+
+
+def all_acts_fc(data: torch.tensor, alexnet_model: torch.nn.Module) -> dict:
+    """
+    parameters:
+        data::torch.tensor - input data of the image, already
+        processed with procces_img function
+        
+        alexnet_model::torch.nn.Module - pretrained alexnet model 
+        loaded from torchvision
+        
+    returns:
+        activations::dict(int:torch.tensor) - forward pass of the network up 
+        until layer number: <layer>, for all relevant layers     
+    """
+    layers = (2, 5, 6)
+    acts = {}
+    for val in layers:
+        acts[val] = layer_acts_fc(data, alexnet_model, val)
+    return acts
+
 
 def correlation_mat(data: np.array) -> np.array:
     """
@@ -187,3 +237,23 @@ def correlation_mat(data: np.array) -> np.array:
     coln = Y * Z * T
     data = data.reshape(X, coln)
     return np.corrcoef(data)
+
+
+# def simple_group_stats(data_paths: list, p: int, binary: bool, nifti: bool, shape: tuple) -> nib.Nifti1Image:
+#     """
+#     for each subject, make a volume where a voxel is 1 if it was in the top 1% for
+#     that subject/layer and 0 if it wasn’t (edited) 
+#     this should give you 16 volumes per layer (because 16 subjects)
+#     then sum across subjects so you get a volume per layer
+#     and look how it changes
+#     """
+#     # to save layer specific images
+#     result = np.zeros(shape)
+    
+#     #sn = lambda x: x.split("_")[-1].split(".")[0]
+    
+#     for dp in data_paths:
+#         data_obj, data = load_rsa(dp)
+#         result += toppvol(data, p=p, affine=data_obj.affine, binary=binary, nifti=nifti)
+    
+#     return nib.Nifti1Image(result, affine=data_obj.affine)
